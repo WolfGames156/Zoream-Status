@@ -5,7 +5,7 @@ import os
 import time
 
 # ENV token
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = 'MTQ0Mjk1NjYxNjU5NTkzNTM5Ng.GedUde.g_JyyU_0foEkpy4r__tAFGUrl57m0ugEuk6MFI'
 
 # Sistem emojileri
 ONLINE = ":online:"
