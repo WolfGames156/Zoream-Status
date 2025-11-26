@@ -20,7 +20,7 @@ OFFLINE = "<:offline:1441850753248526446>"
 CARE = "<:bakim:1441850693387292925>"
 
 CHECK_INTERVAL = 30  # Her 30 saniyede güncelle
-UPTIME_FILE = "uptime.json"
+UPTIME_FILE = "/data/uptime.json"
 
 
 # ------------------- UPTIME ------------------- #
