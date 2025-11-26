@@ -20,7 +20,7 @@ CARE = "<:bakim:1441850693387292925>"
 
 CHECK_INTERVAL = 30  # Mesaj her 30 saniyede güncellenecek
 
-UPTIME_FILE = "uptime.json"
+UPTIME_FILE = "/data/uptime.json"
 
 def load_uptime():
     if not os.path.exists(UPTIME_FILE):
