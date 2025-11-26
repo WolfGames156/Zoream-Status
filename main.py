@@ -6,6 +6,7 @@ import aiohttp
 import discord
 import json
 from discord.ext import commands, tasks
+from datetime import timedelta
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("status-bot")
@@ -18,30 +19,59 @@ ONLINE = "<:online:1441849395757973574>"
 OFFLINE = "<:offline:1441850753248526446>"
 CARE = "<:bakim:1441850693387292925>"
 
-CHECK_INTERVAL_ONLINE = 60
-CHECK_INTERVAL_PROBLEM = 5
-
+CHECK_INTERVAL = 30  # Her 30 saniyede güncelle
 UPTIME_FILE = "uptime.json"
+
+
+# ------------------- UPTIME ------------------- #
 
 def load_uptime():
     if not os.path.exists(UPTIME_FILE):
-        return {"web": {"up":0,"total":0}, "app":{"up":0,"total":0}}
-    with open(UPTIME_FILE,"r") as f:
+        return {
+            "web": {"up": 0, "total": 0},
+            "app": {"up": 0, "total": 0},
+            "start_time": int(time.time())
+        }
+    with open(UPTIME_FILE, "r") as f:
         return json.load(f)
 
+
 def save_uptime(data):
-    with open(UPTIME_FILE,"w") as f:
-        json.dump(data,f,indent=2)
+    with open(UPTIME_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
 
 uptime = load_uptime()
 
+
 def percent(val):
     return round((val["up"] / val["total"] * 100), 2) if val["total"] > 0 else 0.0
+
 
 def progress_bar(percentage):
     filled = int(percentage // 10)
     empty = 10 - filled
     return "█" * filled + "░" * empty
+
+
+def format_duration(seconds: int) -> str:
+    delta = timedelta(seconds=seconds)
+    days = delta.days
+    weeks = days // 7
+    days = days % 7
+    hours = delta.seconds // 3600
+    minutes = (delta.seconds % 3600) // 60
+
+    parts = []
+    if weeks > 0: parts.append(f"{weeks} hafta")
+    if days > 0: parts.append(f"{days} gün")
+    if hours > 0: parts.append(f"{hours} saat")
+    if minutes > 0: parts.append(f"{minutes} dakika")
+
+    return " ".join(parts) if parts else "0 dakika"
+
+
+# ------------------- DISCORD BOT ------------------- #
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -49,7 +79,6 @@ bot = commands.Bot(command_prefix=".", intents=intents)
 
 status_channel = None
 status_message_id = None
-_last_interval = None
 aio_session = None
 
 
@@ -61,6 +90,7 @@ async def get_web_status(url: str) -> str:
     except:
         return "offline"
 
+
 async def get_app_status(url: str) -> str:
     global aio_session
     try:
@@ -68,7 +98,7 @@ async def get_app_status(url: str) -> str:
             text = (await resp.text()).strip().lower()
             if text == "up": return "online"
             if text == "down": return "offline"
-            if text in ("care","bakim","maintenance"): return "bakim"
+            if text in ("care", "bakim", "maintenance"): return "bakim"
             return "offline"
     except:
         return "offline"
@@ -76,15 +106,10 @@ async def get_app_status(url: str) -> str:
 
 def format_status_message(web_status: str, app_status: str) -> discord.Embed:
 
-    # Emojiler
     web_emoji = ONLINE if web_status == "online" else OFFLINE
-    app_emoji = (
-        ONLINE if app_status == "online"
-        else CARE if app_status == "bakim"
-        else OFFLINE
-    )
+    app_emoji = ONLINE if app_status == "online" else CARE if app_status == "bakim" else OFFLINE
 
-    # Renk
+    # Dashboard renk teması
     if web_status == "online" and app_status == "online":
         color = discord.Color.green()
     elif app_status == "bakim":
@@ -92,35 +117,53 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
     else:
         color = discord.Color.red()
 
-    # Uptime hesaplama
     web_percent = percent(uptime["web"])
     app_percent = percent(uptime["app"])
     total = round((web_percent + app_percent) / 2, 2)
 
-    # Progress bar
     bar = progress_bar(total)
+    total_time = int(time.time()) - uptime["start_time"]
+    duration_text = format_duration(total_time)
 
     embed = discord.Embed(
-        title="<a:status:1441869522658267186> Sistem Durum Paneli",
-        description=f"🔄 **Son Güncelleme:** <t:{int(time.time())}:R>",
+        title="🖥️ Sistem Durum Dashboard",
+        description=(
+            f"🔄 **Güncelleme:** <t:{int(time.time())}:R>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ),
         color=color
     )
 
     embed.add_field(
-        name="🌐 Web Sitesi Durumu",
-        value=f"{web_emoji} **{web_status.capitalize()}**\n Uptime: **{web_percent}%**",
+        name="🌐 Web Sitesi",
+        value=(
+            f"```ini\n"
+            f"[ Durum ]  {web_emoji}  {web_status.upper()}\n"
+            f"[ Uptime ] {web_percent}%\n"
+            f"```"
+        ),
         inline=False
     )
 
     embed.add_field(
-        name="💻 Uygulama Durumu",
-        value=f"{app_emoji} **{app_status.capitalize()}**\n \n Uptime: **{app_percent}%**",
+        name="💻 Uygulama Sunucusu",
+        value=(
+            f"```ini\n"
+            f"[ Durum ]  {app_emoji}  {app_status.upper()}\n"
+            f"[ Uptime ] {app_percent}%\n"
+            f"```"
+        ),
         inline=False
     )
 
     embed.add_field(
         name="📊 Toplam Uptime",
-        value=f"**{total}%**\n```\n{bar}\n```",
+        value=(
+            f"```css\n"
+            f"{bar} {total}%\n"
+            f"```"
+            f"(Toplam süre: **{duration_text}**)"
+        ),
         inline=False
     )
 
@@ -135,7 +178,6 @@ async def update_status_message_in_channel(channel):
     web_status = await get_web_status(WEB_URL)
     app_status = await get_app_status(APP_STATUS_URL)
 
-    # Uptime sayaçları
     uptime["web"]["total"] += 1
     uptime["app"]["total"] += 1
     if web_status == "online": uptime["web"]["up"] += 1
@@ -163,21 +205,11 @@ async def update_status_message_in_channel(channel):
     return web_status, app_status
 
 
-
-@tasks.loop(seconds=CHECK_INTERVAL_ONLINE)
+@tasks.loop(seconds=CHECK_INTERVAL)
 async def check_status_loop():
-    global _last_interval
-
     if not status_channel:
         return
-
-    web_status, app_status = await update_status_message_in_channel(status_channel)
-
-    desired = CHECK_INTERVAL_ONLINE if (web_status == "online" and app_status == "online") else CHECK_INTERVAL_PROBLEM
-
-    if desired != _last_interval:
-        check_status_loop.change_interval(seconds=desired)
-        _last_interval = desired
+    await update_status_message_in_channel(status_channel)
 
 
 @bot.event
