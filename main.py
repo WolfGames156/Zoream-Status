@@ -6,7 +6,6 @@ import aiohttp
 import discord
 import json
 from discord.ext import commands, tasks
-from datetime import timedelta
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("status-bot")
@@ -19,59 +18,41 @@ ONLINE = "<:online:1441849395757973574>"
 OFFLINE = "<:offline:1441850753248526446>"
 CARE = "<:bakim:1441850693387292925>"
 
-CHECK_INTERVAL = 30  # Her 30 saniyede güncelle
-UPTIME_FILE = "/data/uptime.json"
+CHECK_INTERVAL = 30  # Mesaj her 30 saniyede güncellenecek
 
-
-# ------------------- UPTIME ------------------- #
+UPTIME_FILE = "uptime.json"
 
 def load_uptime():
     if not os.path.exists(UPTIME_FILE):
-        return {
-            "web": {"up": 0, "total": 0},
-            "app": {"up": 0, "total": 0},
-            "start_time": int(time.time())
-        }
-    with open(UPTIME_FILE, "r") as f:
+        return {"web": {"up":0,"total":0}, "app":{"up":0,"total":0}}
+    with open(UPTIME_FILE,"r") as f:
         return json.load(f)
 
-
 def save_uptime(data):
-    with open(UPTIME_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
+    with open(UPTIME_FILE,"w") as f:
+        json.dump(data,f,indent=2)
 
 uptime = load_uptime()
 
-
 def percent(val):
     return round((val["up"] / val["total"] * 100), 2) if val["total"] > 0 else 0.0
-
 
 def progress_bar(percentage):
     filled = int(percentage // 10)
     empty = 10 - filled
     return "█" * filled + "░" * empty
 
-
-def format_duration(seconds: int) -> str:
-    delta = timedelta(seconds=seconds)
-    days = delta.days
-    weeks = days // 7
-    days = days % 7
-    hours = delta.seconds // 3600
-    minutes = (delta.seconds % 3600) // 60
-
+def format_seconds(seconds: int) -> str:
+    """Saniyeyi gün, saat, dakika, saniye formatına çevirir"""
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
     parts = []
-    if weeks > 0: parts.append(f"{weeks} hafta")
-    if days > 0: parts.append(f"{days} gün")
-    if hours > 0: parts.append(f"{hours} saat")
-    if minutes > 0: parts.append(f"{minutes} dakika")
-
-    return " ".join(parts) if parts else "0 dakika"
-
-
-# ------------------- DISCORD BOT ------------------- #
+    if days > 0: parts.append(f"{days}g")
+    if hours > 0: parts.append(f"{hours}s")
+    if minutes > 0: parts.append(f"{minutes}dk")
+    parts.append(f"{seconds}s")
+    return " ".join(parts)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -90,7 +71,6 @@ async def get_web_status(url: str) -> str:
     except:
         return "offline"
 
-
 async def get_app_status(url: str) -> str:
     global aio_session
     try:
@@ -98,7 +78,7 @@ async def get_app_status(url: str) -> str:
             text = (await resp.text()).strip().lower()
             if text == "up": return "online"
             if text == "down": return "offline"
-            if text in ("care", "bakim", "maintenance"): return "bakim"
+            if text in ("care","bakim","maintenance"): return "bakim"
             return "offline"
     except:
         return "offline"
@@ -106,10 +86,15 @@ async def get_app_status(url: str) -> str:
 
 def format_status_message(web_status: str, app_status: str) -> discord.Embed:
 
+    # Emojiler
     web_emoji = ONLINE if web_status == "online" else OFFLINE
-    app_emoji = ONLINE if app_status == "online" else CARE if app_status == "bakim" else OFFLINE
+    app_emoji = (
+        ONLINE if app_status == "online"
+        else CARE if app_status == "bakim"
+        else OFFLINE
+    )
 
-    # Dashboard renk teması
+    # Renk
     if web_status == "online" and app_status == "online":
         color = discord.Color.green()
     elif app_status == "bakim":
@@ -117,53 +102,41 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
     else:
         color = discord.Color.red()
 
+    # Uptime hesaplama
     web_percent = percent(uptime["web"])
     app_percent = percent(uptime["app"])
-    total = round((web_percent + app_percent) / 2, 2)
+    total_percent = round((web_percent + app_percent) / 2, 2)
 
-    bar = progress_bar(total)
-    total_time = int(time.time()) - uptime["start_time"]
-    duration_text = format_duration(total_time)
+    # Toplam süre (saniye cinsinden)
+    web_total_seconds = uptime["web"]["total"] * CHECK_INTERVAL
+    app_total_seconds = uptime["app"]["total"] * CHECK_INTERVAL
+    total_seconds = (web_total_seconds + app_total_seconds) // 2
+    total_time_str = format_seconds(total_seconds)
+
+    # Progress bar
+    bar = progress_bar(total_percent)
 
     embed = discord.Embed(
-        title="🖥️ Sistem Durum Dashboard",
-        description=(
-            f"🔄 **Güncelleme:** <t:{int(time.time())}:R>\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        ),
+        title="<a:status:1441869522658267186> Sistem Durum Paneli",
+        description=f"🔄 **Son Güncelleme:** <t:{int(time.time())}:R>",
         color=color
     )
 
     embed.add_field(
-        name="🌐 Web Sitesi",
-        value=(
-            f"```ini\n"
-            f"[ Durum ]  {web_emoji}  {web_status.upper()}\n"
-            f"[ Uptime ] {web_percent}%\n"
-            f"```"
-        ),
+        name="🌐 Web Sitesi Durumu",
+        value=f"{web_emoji} **{web_status.capitalize()}**\nUptime: **{web_percent}%**\n\n",
         inline=False
     )
 
     embed.add_field(
-        name="💻 Uygulama Sunucusu",
-        value=(
-            f"```ini\n"
-            f"[ Durum ]  {app_emoji}  {app_status.upper()}\n"
-            f"[ Uptime ] {app_percent}%\n"
-            f"```"
-        ),
+        name="💻 Uygulama Durumu",
+        value=f"{app_emoji} **{app_status.capitalize()}**\nUptime: **{app_percent}%**\n\n",
         inline=False
     )
 
     embed.add_field(
         name="📊 Toplam Uptime",
-        value=(
-            f"```css\n"
-            f"{bar} {total}%\n"
-            f"```"
-            f"(Toplam süre: **{duration_text}**)"
-        ),
+        value=f"**{total_percent}%** ({total_time_str})\n```\n{bar}\n```",
         inline=False
     )
 
@@ -178,6 +151,7 @@ async def update_status_message_in_channel(channel):
     web_status = await get_web_status(WEB_URL)
     app_status = await get_app_status(APP_STATUS_URL)
 
+    # Uptime sayaçları
     uptime["web"]["total"] += 1
     uptime["app"]["total"] += 1
     if web_status == "online": uptime["web"]["up"] += 1
