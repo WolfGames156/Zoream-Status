@@ -84,7 +84,7 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
     ts = int(time.time())
 
     embed = discord.Embed(
-        title="🛰️<a:status:1441869522658267186> Sistem Durum Paneli",
+        title="<a:status:1441869522658267186> Sistem Durum Paneli",
         description=f"🔄 **Son Güncelleme:** <t:{ts}:R>",
         color=color
     )
