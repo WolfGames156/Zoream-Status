@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("status-bot")
 
 # ----- CONFIG -----
-TOKEN = "MTQ0Mjk1NjYxNjU5NTkzNTM5Ng.GedUde.g_JyyU_0foEkpy4r__tAFGUrl57m0ugEuk6MFI" 
+TOKEN = "MTQ0Mjk1NjYxNjU5NTkzNTM5Ng.GedUde.g_JyyU_0foEkpy4r__tAFGUrl57m0ug0Euk6MFI" 
 WEB_URL = "https://zoream.pages.dev"
 APP_STATUS_URL = "https://raw.githubusercontent.com/WolfGames156/hidzor/main/stat1.txt"
 
