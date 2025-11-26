@@ -108,13 +108,13 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
 
     embed.add_field(
         name="🌐 Web Sitesi Durumu",
-        value=f"{web_emoji} **{web_status.capitalize()}**\n💻 Uptime: **{web_percent}%**",
+        value=f"{web_emoji} **{web_status.capitalize()}**\n Uptime: **{web_percent}%**",
         inline=False
     )
 
     embed.add_field(
         name="💻 Uygulama Durumu",
-        value=f"{app_emoji} **{app_status.capitalize()}**\n💻 Uptime: **{app_percent}%**",
+        value=f"{app_emoji} **{app_status.capitalize()}**\n \n Uptime: **{app_percent}%**",
         inline=False
     )
 
