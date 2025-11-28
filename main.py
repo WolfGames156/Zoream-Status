@@ -19,9 +19,9 @@ OFFLINE = "<:offline:1441850753248526446>"
 CARE = "<:bakim:1441850693387292925>"
 
 CHECK_INTERVAL = 30  # Mesaj her 30 saniyede güncellenecek
-
 UPTIME_FILE = "/data/uptime.json"
 
+# ---------------- Uptime ----------------
 def load_uptime():
     if not os.path.exists(UPTIME_FILE):
         return {"web": {"up":0,"total":0}, "app":{"up":0,"total":0}}
@@ -43,7 +43,6 @@ def progress_bar(percentage):
     return "█" * filled + "░" * empty
 
 def format_seconds(seconds: int) -> str:
-    """Saniyeyi gün, saat, dakika, saniye formatına çevirir"""
     days, seconds = divmod(seconds, 86400)
     hours, seconds = divmod(seconds, 3600)
     minutes, seconds = divmod(seconds, 60)
@@ -54,15 +53,17 @@ def format_seconds(seconds: int) -> str:
     parts.append(f"{seconds}s")
     return " ".join(parts)
 
+# ---------------- Bot ----------------
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=".", intents=intents)
 
-status_channel = None
-status_message_id = None
 aio_session = None
 
+# Sunucu bazlı status mesajlarını saklamak için
+status_data = {}  # {guild_id: {"channel": channel, "message_id": id}}
 
+# ---------------- HTTP Status ----------------
 async def get_web_status(url: str) -> str:
     global aio_session
     try:
@@ -83,10 +84,8 @@ async def get_app_status(url: str) -> str:
     except:
         return "offline"
 
-
+# ---------------- Embed ----------------
 def format_status_message(web_status: str, app_status: str) -> discord.Embed:
-
-    # Emojiler
     web_emoji = ONLINE if web_status == "online" else OFFLINE
     app_emoji = (
         ONLINE if app_status == "online"
@@ -94,7 +93,6 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
         else OFFLINE
     )
 
-    # Renk
     if web_status == "online" and app_status == "online":
         color = discord.Color.green()
     elif app_status == "bakim":
@@ -102,18 +100,15 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
     else:
         color = discord.Color.red()
 
-    # Uptime hesaplama
     web_percent = percent(uptime["web"])
     app_percent = percent(uptime["app"])
     total_percent = round((web_percent + app_percent) / 2, 2)
 
-    # Toplam süre (saniye cinsinden)
     web_total_seconds = uptime["web"]["total"] * CHECK_INTERVAL
     app_total_seconds = uptime["app"]["total"] * CHECK_INTERVAL
     total_seconds = (web_total_seconds + app_total_seconds) // 2
     total_time_str = format_seconds(total_seconds)
 
-    # Progress bar
     bar = progress_bar(total_percent)
 
     embed = discord.Embed(
@@ -140,13 +135,13 @@ def format_status_message(web_status: str, app_status: str) -> discord.Embed:
         inline=False
     )
 
-    embed.set_footer(text="Zoream Monitoring • Otomatik Durum Sistemi")
+    embed.set_footer(text="Zoream Monitoring • By SYS_0xA7")
     embed.timestamp = discord.utils.utcnow()
     return embed
 
-
-async def update_status_message_in_channel(channel):
-    global status_message_id, uptime
+# ---------------- Güncelleme ----------------
+async def update_status_message_for_guild(guild_id, channel):
+    global status_data, uptime
 
     web_status = await get_web_status(WEB_URL)
     app_status = await get_app_status(APP_STATUS_URL)
@@ -161,50 +156,63 @@ async def update_status_message_in_channel(channel):
 
     embed = format_status_message(web_status, app_status)
 
+    msg_id = status_data.get(guild_id, {}).get("message_id")
     try:
-        if status_message_id:
+        if msg_id:
             try:
-                msg = await channel.fetch_message(status_message_id)
+                msg = await channel.fetch_message(msg_id)
                 await msg.edit(embed=embed)
             except discord.NotFound:
                 msg = await channel.send(embed=embed)
-                status_message_id = msg.id
+                status_data[guild_id] = {"channel": channel, "message_id": msg.id}
         else:
             msg = await channel.send(embed=embed)
-            status_message_id = msg.id
+            status_data[guild_id] = {"channel": channel, "message_id": msg.id}
 
     except Exception as e:
         log.exception(e)
 
     return web_status, app_status
 
-
+# ---------------- Döngü ----------------
 @tasks.loop(seconds=CHECK_INTERVAL)
 async def check_status_loop():
-    if not status_channel:
-        return
-    await update_status_message_in_channel(status_channel)
+    for guild_id, data in status_data.items():
+        channel = data["channel"]
+        if channel:
+            await update_status_message_for_guild(guild_id, channel)
 
-
+# ---------------- Events ----------------
 @bot.event
 async def on_ready():
     global aio_session
     log.info(f"Bot logged in as {bot.user}")
     aio_session = aiohttp.ClientSession()
 
-
+# ---------------- Commands ----------------
 @bot.command(name="status")
 async def cmd_status(ctx):
-    global status_channel
-    status_channel = ctx.channel
-    await update_status_message_in_channel(status_channel)
+    guild_id = ctx.guild.id
+    channel = ctx.channel
+
+    # Eski status mesajını sil
+    old_msg_id = status_data.get(guild_id, {}).get("message_id")
+    if old_msg_id:
+        try:
+            old_msg = await channel.fetch_message(old_msg_id)
+            await old_msg.delete()
+        except:
+            pass
+
+    # Yeni status mesajını gönder ve kaydet
+    await update_status_message_for_guild(guild_id, channel)
+
     if not check_status_loop.is_running():
         check_status_loop.start()
 
-
+# ---------------- Run ----------------
 def run_bot():
     bot.run(TOKEN)
-
 
 if __name__ == "__main__":
     run_bot()
