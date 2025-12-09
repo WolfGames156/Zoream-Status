@@ -12,7 +12,7 @@ log = logging.getLogger("status-bot")
 
 TOKEN = os.getenv("TOKEN")
 WEB_URL = "https://zoream.pages.dev"
-APP_STATUS_URL = "https://raw.githubusercontent.com/WolfGames156/hidzor/main/stat1.txt"
+APP_STATUS_URL = "https://raw.githubusercontent.com/WolfGames156/Zoream-Server/refs/heads/main/public/stat.txt"
 
 ONLINE = "<:online:1441849395757973574>"
 OFFLINE = "<:offline:1441850753248526446>"
