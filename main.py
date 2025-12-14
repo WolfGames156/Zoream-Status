@@ -19,7 +19,8 @@ OFFLINE = "<:offline:1441850753248526446>"
 CARE = "<:bakim:1441850693387292925>"
 
 CHECK_INTERVAL = 30  # Mesaj her 30 saniyede güncellenecek
-UPTIME_FILE = "/data/uptime.json"
+UPTIME_FILE = "uptime.json"
+
 
 # ---------------- Uptime ----------------
 def load_uptime():
@@ -214,7 +215,7 @@ class IdlePresenceBot(discord.Client):
     async def on_ready(self):
         await self.change_presence(
             status=discord.Status.online,
-            activity=discord.Game(name="Zoream oynuyor")
+            activity=discord.Game(name="Zoream By SYS_0xA7")
         )
         log.info(f"Idle bot logged in as {self.user}")
 
