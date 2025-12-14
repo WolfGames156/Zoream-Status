@@ -187,7 +187,6 @@ async def check_status_loop():
 async def on_ready():
     global aio_session
     log.info(f"Bot logged in as {bot.user}")
-    aio_session = aiohttp.ClientSession()
 
 # ---------------- Commands ----------------
 @bot.command(name="status")
@@ -210,9 +209,28 @@ async def cmd_status(ctx):
     if not check_status_loop.is_running():
         check_status_loop.start()
 
-# ---------------- Run ----------------
-def run_bot():
-    bot.run(TOKEN)
+
+class IdlePresenceBot(discord.Client):
+    async def on_ready(self):
+        await self.change_presence(
+            status=discord.Status.online,
+            activity=discord.Game(name="Zoream oynuyor")
+        )
+        log.info(f"Idle bot logged in as {self.user}")
+
+async def start_idle_bot():
+    intents = discord.Intents.none()
+    client = IdlePresenceBot(intents=intents)
+    await client.start(os.getenv("IDLE_TOKEN"))
+async def main():
+    global aio_session
+    aio_session = aiohttp.ClientSession()
+
+    task_main_bot = asyncio.create_task(bot.start(TOKEN))
+    task_idle_bot = asyncio.create_task(start_idle_bot())
+
+    await asyncio.gather(task_main_bot, task_idle_bot)
+
 
 if __name__ == "__main__":
-    run_bot()
+    asyncio.run(main())
